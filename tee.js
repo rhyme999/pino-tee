@@ -6,7 +6,6 @@ const cloneable = require("cloneable-readable");
 const pump = require("pump");
 const Parse = require("fast-json-parse");
 const minimist = require("minimist");
-const pino = require("pino");
 const fs = require("fs");
 
 function tee(origin) {
@@ -23,20 +22,16 @@ function tee(origin) {
 
 function buildFilter(filter) {
   if (typeof filter === "string") {
-    const num = pino.levels.values[filter];
-
-    if (typeof num === "number" && isFinite(num)) {
-      filter = function(v) {
-        return v.level == num;
-      };
-    } else {
-      throw new Error("no such level");
-    }
+    const level = filter;
+    filter = function(v) {
+      return v.level === level;
+    };
   }
 
   return split(function(line) {
     const res = new Parse(line);
     if (res.value && filter(res.value)) {
+      res.value.time = new Date(res.value.time).toLocaleString();
       return JSON.stringify(res.value) + "\n";
     } else {
       return undefined;
@@ -69,6 +64,8 @@ function start() {
     let dest = args._[i + 1];
     if (dest === ":2") {
       dest = process.stderr;
+    } else if (dest === ":1") {
+      dest = process.stdout;
     } else {
       dest = fs.createWriteStream(dest, { flags: "a" });
     }
